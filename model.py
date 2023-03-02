@@ -130,6 +130,61 @@ class FacialDetectionModel(Model):
             )
         return face_frame
 
+    def crop(self, data, frame):
+        xmin = data["xmin"]
+        ymin = data["ymin"]
+        xmax = data["xmax"]
+        ymax = data["ymax"]
+        face_frame = frame[ymin:ymax, xmin:xmax]
+        logger.debug({"action": "crop", "face_frame.shape": face_frame.shape})
+        return face_frame, xmin, ymin, xmax, ymax
+
+
+class FacialLandmarkRegressionModel(Model):
+    def __init__(self, ie_core, model_path, device_name="CPU", num_requests=0):
+        super(FacialLandmarkRegressionModel, self).__init__(
+            ie_core=ie_core,
+            model_path=model_path,
+            device_name=device_name,
+            num_requests=num_requests,
+        )
+
+    def draw(self, infer_result, frame, xmin, ymin, xmax, ymax):
+        landmark_frame = frame.copy()
+        color_picker = [
+            (255, 0, 0),
+            (0, 255, 0),
+            (0, 0, 255),
+            (0, 255, 255),
+            (255, 0, 255),
+        ]
+        parts = [
+            "right_eye",
+            "left_eye",
+            "nose",
+            "right_mouth",
+            "left_mouth",
+        ]
+        width = xmax - xmin
+        height = ymax - ymin
+        data = np.squeeze(infer_result)
+        for index in range(5):
+            x = int(data[2 * index] * width) + xmin
+            y = int(data[2 * index + 1] * height) + ymin
+            cv.circle(landmark_frame, (x, y), 10, color_picker[index], thickness=-1)
+            cv.putText(
+                landmark_frame,
+                str(index),
+                (x, y - 10),
+                cv.FONT_HERSHEY_PLAIN,
+                2,
+                color_picker[index],
+                1,
+                cv.LINE_AA,
+            )
+            logger.debug({"action": "draw", "part": parts[index], "x": x, "y": y})
+        return landmark_frame
+
 
 if __name__ == "__main__":
     import subprocess
@@ -141,29 +196,37 @@ if __name__ == "__main__":
     DEVICE = 0
     DELAY = 1
     KEYCODE_ESC = 27
-    XMIN = 0
-    YMIN = 1
-    XMAX = 2
-    YMAX = 3
     IECORE = IECore()
-    CMD_OMZ = "omz_downloader --name face-detection-retail-0005"
     PROJECT_ROOT = Path(__file__).resolve().parent
-    MODEL_DIR = PROJECT_ROOT / "intel" / "face-detection-retail-0005"
-    MODEL_PATH = str(MODEL_DIR / "FP16/face-detection-retail-0005")
-    if not MODEL_DIR.exists():
-        subprocess.call(CMD_OMZ.split(" "), cwd=str(PROJECT_ROOT))
-
+    MODEL_PATH = {}
+    FACE_DETECTION_MODEL = "face-detection-retail-0005"
+    LANDMARK_REGRESSION_MODEL = "landmarks-regression-retail-0009"
+    for model in [FACE_DETECTION_MODEL, LANDMARK_REGRESSION_MODEL]:
+        cmd = f"omz_downloader --name {model}"
+        model_dir = PROJECT_ROOT / "intel" / model
+        model_path = str(model_dir / f"FP16/{model}")
+        if not model_dir.exists():
+            subprocess.call(cmd.split(" "), cwd=str(PROJECT_ROOT))
+        MODEL_PATH[model] = model_path
     camera = Camera(DEVICE)
-    face_detector = FacialDetectionModel(IECORE, MODEL_PATH)
+    face_detector = FacialDetectionModel(IECORE, MODEL_PATH[FACE_DETECTION_MODEL])
+    landmark_regression = FacialLandmarkRegressionModel(
+        IECORE, MODEL_PATH[LANDMARK_REGRESSION_MODEL]
+    )
     try:
         while camera.cap.isOpened():
             _, frame = camera.read()
             input_frame = face_detector.prepare_frame(frame)
             infer_result = face_detector.infer(input_frame)
             data_array = face_detector.prepare_data(infer_result, frame)
-            face_frame = face_detector.draw(data_array, frame)
-            cv.imshow("face_frame", face_frame)
-            logger.debug({"face_frame.shape": face_frame.shape})
+            for index, data in enumerate(data_array):
+                face_frame, xmin, ymin, xmax, ymax = face_detector.crop(data, frame)
+                input_frame = landmark_regression.prepare_frame(face_frame)
+                infer_result = landmark_regression.infer(input_frame)
+                landmark_frame = landmark_regression.draw(
+                    infer_result, frame, xmin, ymin, xmax, ymax
+                )
+            cv.imshow("landmark_frame", landmark_frame)
             key = cv.waitKey(DELAY)
             if key == KEYCODE_ESC:
                 raise (KeyboardInterrupt)
