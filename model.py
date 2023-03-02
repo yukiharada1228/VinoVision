@@ -6,16 +6,13 @@ from openvino.inference_engine import IECore
 
 from camera import Camera
 
-# ロギングの設定
 logger = logging.getLogger(__name__)
 
 
 class Model(object):
     def __init__(self, ie_core, model_path, device_name="CPU", num_requests=0):
-        # モデルの読み込み
         net = ie_core.read_network(model_path + ".xml", model_path + ".bin")
 
-        # モデルをデバイス上で実行するための準備
         self.exec_net = ie_core.load_network(
             network=net, device_name=device_name, num_requests=num_requests
         )
@@ -33,7 +30,6 @@ class Model(object):
         _, _, h, w = self.input_size
         input_frame = cv.resize(frame, (h, w)).transpose((2, 0, 1))[np.newaxis]
 
-        # ログ出力
         logger.debug(
             {
                 "action": "prepare_frame",
@@ -45,13 +41,10 @@ class Model(object):
         return input_frame
 
     def infer(self, data):
-        # 入力データを辞書形式に変換
         input_data = {self.input_name: data}
 
-        # 推論を実行し、推論結果を取得
         infer_result = self.exec_net.infer(input_data)[self.output_name]
 
-        # ログ出力
         logger.debug(
             {
                 "action": "infer",
@@ -83,8 +76,12 @@ class FacialDetectionModel(Model):
         index_y = 0
         for data in np.squeeze(input):
             conf = data[index_conf]
+
+            # フレームからはみ出す座標を避けるため、xmin/yminは0未満にならないようにします
             xmin = max(0, int(data[index_xmin] * frame.shape[index_x]))
             ymin = max(0, int(data[index_ymin] * frame.shape[index_y]))
+
+            # フレーム内に収まるよう、xmax/ymaxをframeの幅/高さの範囲内に制限します
             xmax = min(
                 int(data[index_xman] * frame.shape[index_x]), frame.shape[index_x]
             )
@@ -101,6 +98,8 @@ class FacialDetectionModel(Model):
                     "area": area,
                 }
                 data_array.append(data)
+
+                # 検出されたオブジェクトを面積の大きい順にソートし、最も大きいオブジェクトから処理するようにします
                 data_array.sort(key=lambda face: face["area"], reverse=True)
         logger.debug(
             {
@@ -130,6 +129,22 @@ class FacialDetectionModel(Model):
         return frame
 
     def crop(self, data, frame):
+        """
+        このメソッドは、1つの顔の情報だけを処理することで、余分な情報を保持する必要がなくなります。
+        そのため、メモリ使用量を削減できます。また、data_arrayのような一時的なリストを使用する必要がないため、
+        リストの生成にかかる時間や、メモリ使用量も削減できます。
+
+        Args:
+            data: 1つの顔のxmin, ymin, xmax, ymaxが含まれるdict。
+            frame: フレームの画像データ
+
+        Returns:
+            face_frame: 顔領域の画像データ
+            xmin: 顔領域のxmin
+            ymin: 顔領域のymin
+            xmax: 顔領域のxmax
+            ymax: 顔領域のymax
+        """
         xmin = data["xmin"]
         ymin = data["ymin"]
         xmax = data["xmax"]
@@ -163,26 +178,40 @@ class FacialLandmarkRegressionModel(Model):
             "right_mouth",
             "left_mouth",
         ]
-        width = xmax - xmin
-        height = ymax - ymin
-        data = np.squeeze(infer_result)
+        # 領域の幅と高さを計算
+        face_width = xmax - xmin
+        face_height = ymax - ymin
+
+        # 推論結果を取得し、各ランドマークの位置を計算
+        landmark_coords = np.squeeze(infer_result)
         for index in range(max_num):
-            x = int(data[2 * index] * width) + xmin
-            y = int(data[2 * index + 1] * height) + ymin
-            cv.circle(frame, (x, y), 10, color_picker[index], thickness=-1)
+            
+            # 推論結果から各ランドマークの位置を取得する。
+            # 各ランドマークの座標は0.0〜1.0で表されているので、
+            # フレーム内の実際の位置に変換するために、
+            # フレームの領域幅と高さにそれぞれ掛けてから、
+            # フレームのxmin、yminの値を足すことで実際の座標を計算する。
+            INDEX_X = 2 * index
+            INDEX_Y = 2 * index + 1
+            landmark_x = int(landmark_coords[INDEX_X] * face_width) + xmin
+            landmark_y = int(landmark_coords[INDEX_Y] * face_height) + ymin
+
+            # 画像上にランドマークを描画
+            cv.circle(frame, (landmark_x, landmark_y), 10, color_picker[index], thickness=-1)
             cv.putText(
                 frame,
                 str(index),
-                (x, y - 10),
+                (landmark_x, landmark_y - 10),
                 cv.FONT_HERSHEY_PLAIN,
                 2,
                 color_picker[index],
                 1,
                 cv.LINE_AA,
             )
-            logger.debug({"action": "draw", "part": parts[index], "x": x, "y": y})
 
-    def crop(self, infer_result, frame, xmin, ymin, xmax, ymax):
+            logger.debug({"action": "draw", "part": parts[index], "x": landmark_x, "y": landmark_y})
+
+    def crop(self, infer_result, xmin, ymin, xmax, ymax):
         parts = [
             "right_eye",
             "left_eye",
@@ -190,16 +219,19 @@ class FacialLandmarkRegressionModel(Model):
             "right_mouth",
             "left_mouth",
         ]
-        data_array = []
-        width = xmax - xmin
-        height = ymax - ymin
-        infer_result = np.squeeze(infer_result)
-        for index in range(2):
-            x = int(infer_result[2 * index] * width) + xmin
-            y = int(infer_result[2 * index + 1] * height) + ymin
-            data_array.append((x, y))
-            logger.debug({"action": "crop", "part": parts[index], "x": x, "y": y})
-        return data_array
+        landmarks = []
+        face_width = xmax - xmin
+        face_height = ymax - ymin
+        landmark_coords = np.squeeze(infer_result)
+        for index in range(len(parts)):
+            INDEX_X = 2 * index
+            INDEX_Y = 2 * index + 1
+            landmark_x = int(landmark_coords[INDEX_X] * face_width) + xmin
+            landmark_y = int(landmark_coords[INDEX_Y] * face_height) + ymin
+            landmarks.append((landmark_x, landmark_y))
+            logger.debug({"action": "crop", "part": parts[index], "landmark_x": landmark_x, "landmark_y": landmark_y})
+        # ランドマークの位置座標のリストを返す
+        return landmarks
 
 
 if __name__ == "__main__":
@@ -244,7 +276,7 @@ if __name__ == "__main__":
                 input_frame = landmark_regression.prepare_frame(face_frame)
                 infer_result = landmark_regression.infer(input_frame)
                 data_array = landmark_regression.crop(
-                    infer_result, frame, xmin, ymin, xmax, ymax
+                    infer_result, xmin, ymin, xmax, ymax
                 )
                 for index, data in enumerate(data_array):
                     x, y = data
