@@ -219,6 +219,10 @@ if __name__ == "__main__":
     DEVICE = 0
     DELAY = 1
     KEYCODE_ESC = 27
+    FACE_FRAME_INDEX_X = 1
+    FACE_FRAME_INDEX_Y = 0
+    RIGHT_EYE_INDEX = 0
+    LEFT_EYE_INDEX = 1
     IECORE = IECore()
     PROJECT_ROOT = Path(__file__).resolve().parent
     MODEL_PATH = {}
@@ -246,19 +250,26 @@ if __name__ == "__main__":
                 face_frame, xmin, ymin, xmax, ymax = face_detector.crop(data, frame)
                 input_frame = landmark_regression.prepare_frame(face_frame)
                 infer_result = landmark_regression.infer(input_frame)
-                data_array = landmark_regression.crop(infer_result, frame, xmin, ymin, xmax, ymax)
+                data_array = landmark_regression.crop(
+                    infer_result, frame, xmin, ymin, xmax, ymax
+                )
                 for index, data in enumerate(data_array):
                     x, y = data
-                    eye_frame = frame[y-face_frame.shape[0]//10:y+face_frame.shape[0]//10, x-face_frame.shape[1]//10:x+face_frame.shape[1]//10]
+                    eye_frame = frame[
+                        y - face_frame.shape[FACE_FRAME_INDEX_Y] // 10 : y + face_frame.shape[FACE_FRAME_INDEX_Y] // 10,
+                        x - face_frame.shape[FACE_FRAME_INDEX_X] // 10 : x + face_frame.shape[FACE_FRAME_INDEX_X] // 10,
+                    ]
                     eye_frame = cv.resize(eye_frame, (300, 300))
                     eye_frame = cv.cvtColor(eye_frame, cv.COLOR_BGR2YUV)
-                    eye_frame[:,:,0] = cv.equalizeHist(eye_frame[:,:,0])
+                    eye_frame[:, :, 0] = cv.equalizeHist(eye_frame[:, :, 0])
                     eye_frame = cv.cvtColor(eye_frame, cv.COLOR_YUV2BGR)
-                    if index == 0:
+                    if index == RIGHT_EYE_INDEX:
                         cv.imshow("right_eye_frame", eye_frame)
-                    else:
+                    elif index == LEFT_EYE_INDEX:
                         cv.imshow("left_eye_frame", eye_frame)
-                landmark_regression.draw(infer_result, frame, xmin, ymin, xmax, ymax, max_num=2)
+                landmark_regression.draw(
+                    infer_result, frame, xmin, ymin, xmax, ymax, max_num=2
+                )
             cv.imshow("frame", frame)
             key = cv.waitKey(DELAY)
             if key == KEYCODE_ESC:
