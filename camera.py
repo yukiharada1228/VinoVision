@@ -46,7 +46,6 @@ if __name__ == "__main__":
         while camera.cap.isOpened():
             _, frame = camera.read()
             cv.imshow("frame", frame)
-            cv.imwrite("frame.jpg", frame)
             logger.debug({"frame.shape": frame.shape})
             key = cv.waitKey(DELAY)
             if key == KEYCODE_ESC:
