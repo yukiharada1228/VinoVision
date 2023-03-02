@@ -196,28 +196,23 @@ if __name__ == "__main__":
     DEVICE = 0
     DELAY = 1
     KEYCODE_ESC = 27
-    XMIN = 0
-    YMIN = 1
-    XMAX = 2
-    YMAX = 3
     IECORE = IECore()
     PROJECT_ROOT = Path(__file__).resolve().parent
-    FACE_CMD_OMZ = "omz_downloader --name face-detection-retail-0005"
-    LANDMARK_CMD_OMZ = "omz_downloader --name landmarks-regression-retail-0009"
-    FACE_MODEL_DIR = PROJECT_ROOT / "intel" / "face-detection-retail-0005"
-    LANDMARK_MODEL_DIR = PROJECT_ROOT / "intel" / "landmarks-regression-retail-0009"
-    FACE_MODEL_PATH = str(FACE_MODEL_DIR / "FP16/face-detection-retail-0005")
-    LANDMARK_MODEL_PATH = str(
-        LANDMARK_MODEL_DIR / "FP16/landmarks-regression-retail-0009"
-    )
-    if not FACE_MODEL_DIR.exists():
-        subprocess.call(FACE_CMD_OMZ.split(" "), cwd=str(PROJECT_ROOT))
-    if not LANDMARK_MODEL_DIR.exists():
-        subprocess.call(LANDMARK_CMD_OMZ.split(" "), cwd=str(PROJECT_ROOT))
-
+    MODEL_PATH = {}
+    FACE_DETECTION_MODEL = "face-detection-retail-0005"
+    LANDMARK_DETECTION_MODEL = "landmarks-regression-retail-0009"
+    for model in [FACE_DETECTION_MODEL, LANDMARK_DETECTION_MODEL]:
+        cmd = f"omz_downloader --name {model}"
+        model_dir = PROJECT_ROOT / "intel" / model
+        model_path = str(model_dir / f"FP16/{model}")
+        if not model_dir.exists():
+            subprocess.call(cmd.split(" "), cwd=str(PROJECT_ROOT))
+        MODEL_PATH[model] = model_path
     camera = Camera(DEVICE)
-    face_detector = FacialDetectionModel(IECORE, FACE_MODEL_PATH)
-    landmark_detector = FacialLandmarkDetectionModel(IECORE, LANDMARK_MODEL_PATH)
+    face_detector = FacialDetectionModel(IECORE, MODEL_PATH[FACE_DETECTION_MODEL])
+    landmark_detector = FacialLandmarkDetectionModel(
+        IECORE, MODEL_PATH[LANDMARK_DETECTION_MODEL]
+    )
     try:
         while camera.cap.isOpened():
             _, frame = camera.read()
