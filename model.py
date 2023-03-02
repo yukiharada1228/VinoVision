@@ -55,3 +55,8 @@ class Model(object):
                       'infer_result.shape': infer_result.shape})
         
         return infer_result
+
+class FacialDetectionModel(Model):
+
+    def __init__(self, ie_core, model_path, device_name='CPU', num_requests=0):
+        super(FacialDetectionModel, self).__init__(ie_core=ie_core, model_path=model_path, device_name=device_name, num_requests=num_requests)
