@@ -148,7 +148,7 @@ class FacialLandmarkRegressionModel(Model):
             num_requests=num_requests,
         )
 
-    def draw(self, infer_result, frame, xmin, ymin, xmax, ymax):
+    def draw(self, infer_result, frame, xmin, ymin, xmax, ymax, max_num=5):
         color_picker = [
             (255, 0, 0),
             (0, 255, 0),
@@ -166,7 +166,7 @@ class FacialLandmarkRegressionModel(Model):
         width = xmax - xmin
         height = ymax - ymin
         data = np.squeeze(infer_result)
-        for index in range(5):
+        for index in range(max_num):
             x = int(data[2 * index] * width) + xmin
             y = int(data[2 * index + 1] * height) + ymin
             cv.circle(frame, (x, y), 10, color_picker[index], thickness=-1)
@@ -181,6 +181,32 @@ class FacialLandmarkRegressionModel(Model):
                 cv.LINE_AA,
             )
             logger.debug({"action": "draw", "part": parts[index], "x": x, "y": y})
+
+    def crop(self, infer_result, frame, xmin, ymin, xmax, ymax):
+        color_picker = [
+            (255, 0, 0),
+            (0, 255, 0),
+            (0, 0, 255),
+            (0, 255, 255),
+            (255, 0, 255),
+        ]
+        parts = [
+            "right_eye",
+            "left_eye",
+            "nose",
+            "right_mouth",
+            "left_mouth",
+        ]
+        data_array = []
+        width = xmax - xmin
+        height = ymax - ymin
+        infer_result = np.squeeze(infer_result)
+        for index in range(2):
+            x = int(infer_result[2 * index] * width) + xmin
+            y = int(infer_result[2 * index + 1] * height) + ymin
+            data_array.append((x, y))
+            logger.debug({"action": "crop", "part": parts[index], "x": x, "y": y})
+        return data_array
 
 
 if __name__ == "__main__":
@@ -220,7 +246,19 @@ if __name__ == "__main__":
                 face_frame, xmin, ymin, xmax, ymax = face_detector.crop(data, frame)
                 input_frame = landmark_regression.prepare_frame(face_frame)
                 infer_result = landmark_regression.infer(input_frame)
-                landmark_regression.draw(infer_result, frame, xmin, ymin, xmax, ymax)
+                data_array = landmark_regression.crop(infer_result, frame, xmin, ymin, xmax, ymax)
+                for index, data in enumerate(data_array):
+                    x, y = data
+                    eye_frame = frame[y-face_frame.shape[0]//10:y+face_frame.shape[0]//10, x-face_frame.shape[1]//10:x+face_frame.shape[1]//10]
+                    eye_frame = cv.resize(eye_frame, (300, 300))
+                    eye_frame = cv.cvtColor(eye_frame, cv.COLOR_BGR2YUV)
+                    eye_frame[:,:,0] = cv.equalizeHist(eye_frame[:,:,0])
+                    eye_frame = cv.cvtColor(eye_frame, cv.COLOR_YUV2BGR)
+                    if index == 0:
+                        cv.imshow("right_eye_frame", eye_frame)
+                    else:
+                        cv.imshow("left_eye_frame", eye_frame)
+                landmark_regression.draw(infer_result, frame, xmin, ymin, xmax, ymax, max_num=2)
             cv.imshow("frame", frame)
             key = cv.waitKey(DELAY)
             if key == KEYCODE_ESC:
