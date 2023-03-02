@@ -130,6 +130,18 @@ class FacialDetectionModel(Model):
             )
         return face_frame
 
+    def crop(self, data_array, frame):
+        face_frame_array = []
+        for data in data_array:
+            xmin = data["xmin"]
+            ymin = data["ymin"]
+            xmax = data["xmax"]
+            ymax = data["ymax"]
+            face_frame = frame[ymin:ymax, xmin:xmax]
+            face_frame_array.append(face_frame)
+            logger.debug({"action": "crop", "face_frame.shape": face_frame.shape})
+        return face_frame_array
+
 
 if __name__ == "__main__":
     import subprocess
@@ -161,9 +173,9 @@ if __name__ == "__main__":
             input_frame = face_detector.prepare_frame(frame)
             infer_result = face_detector.infer(input_frame)
             data_array = face_detector.prepare_data(infer_result, frame)
-            face_frame = face_detector.draw(data_array, frame)
-            cv.imshow("face_frame", face_frame)
-            logger.debug({"face_frame.shape": face_frame.shape})
+            face_frame_array = face_detector.crop(data_array, frame)
+            for face_frame in face_frame_array:
+                cv.imshow(f"face_frame", face_frame)
             key = cv.waitKey(DELAY)
             if key == KEYCODE_ESC:
                 raise (KeyboardInterrupt)
