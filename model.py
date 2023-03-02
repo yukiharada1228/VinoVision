@@ -185,7 +185,6 @@ class FacialLandmarkRegressionModel(Model):
         # 推論結果を取得し、各ランドマークの位置を計算
         landmark_coords = np.squeeze(infer_result)
         for index in range(max_num):
-            
             # 推論結果から各ランドマークの位置を取得する。
             # 各ランドマークの座標は0.0〜1.0で表されているので、
             # フレーム内の実際の位置に変換するために、
@@ -197,7 +196,9 @@ class FacialLandmarkRegressionModel(Model):
             landmark_y = int(landmark_coords[INDEX_Y] * face_height) + ymin
 
             # 画像上にランドマークを描画
-            cv.circle(frame, (landmark_x, landmark_y), 10, color_picker[index], thickness=-1)
+            cv.circle(
+                frame, (landmark_x, landmark_y), 10, color_picker[index], thickness=-1
+            )
             cv.putText(
                 frame,
                 str(index),
@@ -209,7 +210,14 @@ class FacialLandmarkRegressionModel(Model):
                 cv.LINE_AA,
             )
 
-            logger.debug({"action": "draw", "part": parts[index], "x": landmark_x, "y": landmark_y})
+            logger.debug(
+                {
+                    "action": "draw",
+                    "part": parts[index],
+                    "x": landmark_x,
+                    "y": landmark_y,
+                }
+            )
 
     def crop(self, infer_result, xmin, ymin, xmax, ymax):
         parts = [
@@ -229,7 +237,14 @@ class FacialLandmarkRegressionModel(Model):
             landmark_x = int(landmark_coords[INDEX_X] * face_width) + xmin
             landmark_y = int(landmark_coords[INDEX_Y] * face_height) + ymin
             landmarks.append((landmark_x, landmark_y))
-            logger.debug({"action": "crop", "part": parts[index], "landmark_x": landmark_x, "landmark_y": landmark_y})
+            logger.debug(
+                {
+                    "action": "crop",
+                    "part": parts[index],
+                    "landmark_x": landmark_x,
+                    "landmark_y": landmark_y,
+                }
+            )
         # ランドマークの位置座標のリストを返す
         return landmarks
 
@@ -281,8 +296,12 @@ if __name__ == "__main__":
                 for index, data in enumerate(data_array):
                     x, y = data
                     eye_frame = frame[
-                        y - face_frame.shape[FACE_FRAME_INDEX_Y] // 10 : y + face_frame.shape[FACE_FRAME_INDEX_Y] // 10,
-                        x - face_frame.shape[FACE_FRAME_INDEX_X] // 10 : x + face_frame.shape[FACE_FRAME_INDEX_X] // 10,
+                        y
+                        - face_frame.shape[FACE_FRAME_INDEX_Y] // 10 : y
+                        + face_frame.shape[FACE_FRAME_INDEX_Y] // 10,
+                        x
+                        - face_frame.shape[FACE_FRAME_INDEX_X] // 10 : x
+                        + face_frame.shape[FACE_FRAME_INDEX_X] // 10,
                     ]
                     eye_frame = cv.resize(eye_frame, (300, 300))
                     eye_frame = cv.cvtColor(eye_frame, cv.COLOR_BGR2YUV)
