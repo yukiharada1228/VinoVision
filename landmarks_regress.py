@@ -42,10 +42,8 @@ try:
             face_frame, xmin, ymin, xmax, ymax = face_detector.crop(data, frame)
             input_frame = landmark_regression.prepare_frame(face_frame)
             infer_result = landmark_regression.infer(input_frame)
-            landmark_frame = landmark_regression.draw(
-                infer_result, frame, xmin, ymin, xmax, ymax
-            )
-        cv.imshow("landmark_frame", landmark_frame)
+            landmark_regression.draw(infer_result, frame, xmin, ymin, xmax, ymax)
+        cv.imshow("frame", frame)
         key = cv.waitKey(DELAY)
         if key == KEYCODE_ESC:
             raise (KeyboardInterrupt)

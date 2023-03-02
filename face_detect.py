@@ -31,9 +31,9 @@ try:
         input_frame = face_detector.prepare_frame(frame)
         infer_result = face_detector.infer(input_frame)
         data_array = face_detector.prepare_data(infer_result, frame)
-        face_frame = face_detector.draw(data_array, frame)
-        cv.imshow("face_frame", face_frame)
-        logger.debug({"face_frame.shape": face_frame.shape})
+        face_detector.draw(data_array, frame)
+        cv.imshow("frame", frame)
+        logger.debug({"frame.shape": frame.shape})
         key = cv.waitKey(DELAY)
         if key == KEYCODE_ESC:
             raise (KeyboardInterrupt)
