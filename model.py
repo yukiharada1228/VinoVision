@@ -140,9 +140,9 @@ class FacialDetectionModel(Model):
         return face_frame, xmin, ymin, xmax, ymax
 
 
-class FacialLandmarkDetectionModel(Model):
+class FacialLandmarkRegressionModel(Model):
     def __init__(self, ie_core, model_path, device_name="CPU", num_requests=0):
-        super(FacialLandmarkDetectionModel, self).__init__(
+        super(FacialLandmarkRegressionModel, self).__init__(
             ie_core=ie_core,
             model_path=model_path,
             device_name=device_name,
@@ -200,8 +200,8 @@ if __name__ == "__main__":
     PROJECT_ROOT = Path(__file__).resolve().parent
     MODEL_PATH = {}
     FACE_DETECTION_MODEL = "face-detection-retail-0005"
-    LANDMARK_DETECTION_MODEL = "landmarks-regression-retail-0009"
-    for model in [FACE_DETECTION_MODEL, LANDMARK_DETECTION_MODEL]:
+    LANDMARK_REGRESSION_MODEL = "landmarks-regression-retail-0009"
+    for model in [FACE_DETECTION_MODEL, LANDMARK_REGRESSION_MODEL]:
         cmd = f"omz_downloader --name {model}"
         model_dir = PROJECT_ROOT / "intel" / model
         model_path = str(model_dir / f"FP16/{model}")
@@ -210,8 +210,8 @@ if __name__ == "__main__":
         MODEL_PATH[model] = model_path
     camera = Camera(DEVICE)
     face_detector = FacialDetectionModel(IECORE, MODEL_PATH[FACE_DETECTION_MODEL])
-    landmark_detector = FacialLandmarkDetectionModel(
-        IECORE, MODEL_PATH[LANDMARK_DETECTION_MODEL]
+    landmark_regression = FacialLandmarkRegressionModel(
+        IECORE, MODEL_PATH[LANDMARK_REGRESSION_MODEL]
     )
     try:
         while camera.cap.isOpened():
@@ -221,9 +221,9 @@ if __name__ == "__main__":
             data_array = face_detector.prepare_data(infer_result, frame)
             for index, data in enumerate(data_array):
                 face_frame, xmin, ymin, xmax, ymax = face_detector.crop(data, frame)
-                input_frame = landmark_detector.prepare_frame(face_frame)
-                infer_result = landmark_detector.infer(input_frame)
-                landmark_frame = landmark_detector.draw(
+                input_frame = landmark_regression.prepare_frame(face_frame)
+                infer_result = landmark_regression.infer(input_frame)
+                landmark_frame = landmark_regression.draw(
                     infer_result, frame, xmin, ymin, xmax, ymax
                 )
             cv.imshow("landmark_frame", landmark_frame)
