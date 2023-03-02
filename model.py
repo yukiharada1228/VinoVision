@@ -183,13 +183,6 @@ class FacialLandmarkRegressionModel(Model):
             logger.debug({"action": "draw", "part": parts[index], "x": x, "y": y})
 
     def crop(self, infer_result, frame, xmin, ymin, xmax, ymax):
-        color_picker = [
-            (255, 0, 0),
-            (0, 255, 0),
-            (0, 0, 255),
-            (0, 255, 255),
-            (255, 0, 255),
-        ]
         parts = [
             "right_eye",
             "left_eye",
