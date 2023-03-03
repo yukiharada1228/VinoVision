@@ -249,6 +249,22 @@ class FacialLandmarkRegressionModel(Model):
         return landmarks
 
 
+class OpenClosedEye(Model):
+    def __init__(self, ie_core, model_path, device_name="CPU", num_requests=0):
+        super(OpenClosedEye, self).__init__(
+            ie_core=ie_core,
+            model_path=model_path,
+            device_name=device_name,
+            num_requests=num_requests,
+        )
+
+    def prepare_data(self, output):
+        if output[0][0] > output[0][1]:
+            return "closed"
+        else:
+            return "open"
+
+
 if __name__ == "__main__":
     import subprocess
     import sys
@@ -268,18 +284,31 @@ if __name__ == "__main__":
     MODEL_PATH = {}
     FACE_DETECTION_MODEL = "face-detection-retail-0005"
     LANDMARK_REGRESSION_MODEL = "landmarks-regression-retail-0009"
-    for model in [FACE_DETECTION_MODEL, LANDMARK_REGRESSION_MODEL]:
+    OPEN_CLOSED_EYE_MODEL = "open-closed-eye-0001"
+    MODELS = [FACE_DETECTION_MODEL, LANDMARK_REGRESSION_MODEL]
+    for model in MODELS:
         cmd = f"omz_downloader --name {model}"
         model_dir = PROJECT_ROOT / "intel" / model
-        model_path = str(model_dir / f"FP16/{model}")
+        model_path = str(model_dir / f"FP32/{model}")
         if not model_dir.exists():
             subprocess.call(cmd.split(" "), cwd=str(PROJECT_ROOT))
         MODEL_PATH[model] = model_path
+    cmd = f"omz_downloader --name {OPEN_CLOSED_EYE_MODEL}"
+    model_dir = PROJECT_ROOT / "public" / OPEN_CLOSED_EYE_MODEL
+    model_path = str(model_dir / f"FP32/{OPEN_CLOSED_EYE_MODEL}")
+    if not model_dir.exists():
+        subprocess.call(cmd.split(" "), cwd=str(PROJECT_ROOT))
+        subprocess.call(
+            f"omz_converter --name {OPEN_CLOSED_EYE_MODEL}".split(" "),
+            cwd=str(PROJECT_ROOT),
+        )
+    MODEL_PATH[OPEN_CLOSED_EYE_MODEL] = model_path
     camera = Camera(DEVICE)
     face_detector = FacialDetectionModel(IECORE, MODEL_PATH[FACE_DETECTION_MODEL])
     landmark_regression = FacialLandmarkRegressionModel(
         IECORE, MODEL_PATH[LANDMARK_REGRESSION_MODEL]
     )
+    open_closed_eye = OpenClosedEye(IECORE, MODEL_PATH[OPEN_CLOSED_EYE_MODEL])
     try:
         while camera.cap.isOpened():
             _, frame = camera.read()
@@ -297,16 +326,26 @@ if __name__ == "__main__":
                     x, y = data
                     eye_frame = frame[
                         y
-                        - face_frame.shape[FACE_FRAME_INDEX_Y] // 10 : y
-                        + face_frame.shape[FACE_FRAME_INDEX_Y] // 10,
+                        - face_frame.shape[FACE_FRAME_INDEX_Y] // 5 : y
+                        + face_frame.shape[FACE_FRAME_INDEX_Y] // 5,
                         x
-                        - face_frame.shape[FACE_FRAME_INDEX_X] // 10 : x
-                        + face_frame.shape[FACE_FRAME_INDEX_X] // 10,
+                        - face_frame.shape[FACE_FRAME_INDEX_X] // 5 : x
+                        + face_frame.shape[FACE_FRAME_INDEX_X] // 5,
                     ]
+                    input_frame = open_closed_eye.prepare_frame(eye_frame)
+                    eye_infer_result = open_closed_eye.infer(input_frame)
+                    eye_infer_result = open_closed_eye.prepare_data(eye_infer_result)
                     eye_frame = cv.resize(eye_frame, (300, 300))
-                    eye_frame = cv.cvtColor(eye_frame, cv.COLOR_BGR2YUV)
-                    eye_frame[:, :, 0] = cv.equalizeHist(eye_frame[:, :, 0])
-                    eye_frame = cv.cvtColor(eye_frame, cv.COLOR_YUV2BGR)
+                    cv.putText(
+                        eye_frame,
+                        eye_infer_result,
+                        (100, 100),
+                        cv.FONT_HERSHEY_PLAIN,
+                        2,
+                        (0, 255, 255) if eye_infer_result == "open" else (255, 0, 0),
+                        1,
+                        cv.LINE_AA,
+                    )
                     if index == RIGHT_EYE_INDEX:
                         cv.imshow("right_eye_frame", eye_frame)
                     elif index == LEFT_EYE_INDEX:

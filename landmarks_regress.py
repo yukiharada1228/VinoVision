@@ -20,10 +20,11 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 MODEL_PATH = {}
 FACE_DETECTION_MODEL = "face-detection-retail-0005"
 LANDMARK_REGRESSION_MODEL = "landmarks-regression-retail-0009"
-for model in [FACE_DETECTION_MODEL, LANDMARK_REGRESSION_MODEL]:
+MODELS = [FACE_DETECTION_MODEL, LANDMARK_REGRESSION_MODEL]
+for model in MODELS:
     cmd = f"omz_downloader --name {model}"
     model_dir = PROJECT_ROOT / "intel" / model
-    model_path = str(model_dir / f"FP16/{model}")
+    model_path = str(model_dir / f"FP32/{model}")
     if not model_dir.exists():
         subprocess.call(cmd.split(" "), cwd=str(PROJECT_ROOT))
     MODEL_PATH[model] = model_path
