@@ -2,6 +2,8 @@ intel/*
 public/*
 memo.py
 face.jpg
+Pipfile
+Pipfile.lock
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
