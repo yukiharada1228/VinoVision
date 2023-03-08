@@ -249,9 +249,9 @@ class FacialLandmarkRegressionModel(Model):
         return landmarks
 
 
-class OpenClosedEye(Model):
+class OpenClosedEyeRegression(Model):
     def __init__(self, ie_core, model_path, device_name="CPU", num_requests=0):
-        super(OpenClosedEye, self).__init__(
+        super(OpenClosedEyeRegression, self).__init__(
             ie_core=ie_core,
             model_path=model_path,
             device_name=device_name,
