@@ -20,7 +20,7 @@ IECORE = IECore()
 CMD_OMZ = "omz_downloader --name face-detection-retail-0005"
 PROJECT_ROOT = Path(__file__).resolve().parent
 MODEL_DIR = PROJECT_ROOT / "intel" / "face-detection-retail-0005"
-MODEL_PATH = str(MODEL_DIR / "FP16/face-detection-retail-0005")
+MODEL_PATH = str(MODEL_DIR / "FP32/face-detection-retail-0005")
 if not MODEL_DIR.exists():
     subprocess.call(CMD_OMZ.split(" "), cwd=str(PROJECT_ROOT))
 camera = Camera(DEVICE)
@@ -31,9 +31,9 @@ try:
         input_frame = face_detector.prepare_frame(frame)
         infer_result = face_detector.infer(input_frame)
         data_array = face_detector.prepare_data(infer_result, frame)
-        face_frame = face_detector.draw(data_array, frame)
-        cv.imshow("face_frame", face_frame)
-        logger.debug({"face_frame.shape": face_frame.shape})
+        face_detector.draw(data_array, frame)
+        cv.imshow("frame", frame)
+        logger.debug({"frame.shape": frame.shape})
         key = cv.waitKey(DELAY)
         if key == KEYCODE_ESC:
             raise (KeyboardInterrupt)

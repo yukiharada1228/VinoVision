@@ -6,16 +6,13 @@ from openvino.inference_engine import IECore
 
 from camera import Camera
 
-# ロギングの設定
 logger = logging.getLogger(__name__)
 
 
 class Model(object):
     def __init__(self, ie_core, model_path, device_name="CPU", num_requests=0):
-        # モデルの読み込み
         net = ie_core.read_network(model_path + ".xml", model_path + ".bin")
 
-        # モデルをデバイス上で実行するための準備
         self.exec_net = ie_core.load_network(
             network=net, device_name=device_name, num_requests=num_requests
         )
@@ -33,7 +30,6 @@ class Model(object):
         _, _, h, w = self.input_size
         input_frame = cv.resize(frame, (h, w)).transpose((2, 0, 1))[np.newaxis]
 
-        # ログ出力
         logger.debug(
             {
                 "action": "prepare_frame",
@@ -45,13 +41,10 @@ class Model(object):
         return input_frame
 
     def infer(self, data):
-        # 入力データを辞書形式に変換
         input_data = {self.input_name: data}
 
-        # 推論を実行し、推論結果を取得
         infer_result = self.exec_net.infer(input_data)[self.output_name]
 
-        # ログ出力
         logger.debug(
             {
                 "action": "infer",
@@ -83,8 +76,12 @@ class FacialDetectionModel(Model):
         index_y = 0
         for data in np.squeeze(input):
             conf = data[index_conf]
+
+            # フレームからはみ出す座標を避けるため、xmin/yminは0未満にならないようにします
             xmin = max(0, int(data[index_xmin] * frame.shape[index_x]))
             ymin = max(0, int(data[index_ymin] * frame.shape[index_y]))
+
+            # フレーム内に収まるよう、xmax/ymaxをframeの幅/高さの範囲内に制限します
             xmax = min(
                 int(data[index_xman] * frame.shape[index_x]), frame.shape[index_x]
             )
@@ -101,6 +98,8 @@ class FacialDetectionModel(Model):
                     "area": area,
                 }
                 data_array.append(data)
+
+                # 検出されたオブジェクトを面積の大きい順にソートし、最も大きいオブジェクトから処理するようにします
                 data_array.sort(key=lambda face: face["area"], reverse=True)
         logger.debug(
             {
@@ -112,11 +111,10 @@ class FacialDetectionModel(Model):
         return data_array
 
     def draw(self, data_array, frame):
-        face_frame = frame.copy()
         blue = (255, 0, 0)
         for data in data_array:
             cv.rectangle(
-                face_frame,
+                frame,
                 (int(data["xmin"]), int(data["ymin"])),
                 (int(data["xmax"]), int(data["ymax"])),
                 color=blue,
@@ -125,12 +123,28 @@ class FacialDetectionModel(Model):
             logger.debug(
                 {
                     "action": "draw",
-                    "face_frame.shape": face_frame.shape,
+                    "frame.shape": frame.shape,
                 }
             )
-        return face_frame
+        return frame
 
     def crop(self, data, frame):
+        """
+        このメソッドは、1つの顔の情報だけを処理することで、余分な情報を保持する必要がなくなります。
+        そのため、メモリ使用量を削減できます。また、data_arrayのような一時的なリストを使用する必要がないため、
+        リストの生成にかかる時間や、メモリ使用量も削減できます。
+
+        Args:
+            data: 1つの顔のxmin, ymin, xmax, ymaxが含まれるdict。
+            frame: フレームの画像データ
+
+        Returns:
+            face_frame: 顔領域の画像データ
+            xmin: 顔領域のxmin
+            ymin: 顔領域のymin
+            xmax: 顔領域のxmax
+            ymax: 顔領域のymax
+        """
         xmin = data["xmin"]
         ymin = data["ymin"]
         xmax = data["xmax"]
@@ -149,8 +163,7 @@ class FacialLandmarkRegressionModel(Model):
             num_requests=num_requests,
         )
 
-    def draw(self, infer_result, frame, xmin, ymin, xmax, ymax):
-        landmark_frame = frame.copy()
+    def draw(self, infer_result, frame, xmin, ymin, xmax, ymax, max_num=5):
         color_picker = [
             (255, 0, 0),
             (0, 255, 0),
@@ -165,25 +178,91 @@ class FacialLandmarkRegressionModel(Model):
             "right_mouth",
             "left_mouth",
         ]
-        width = xmax - xmin
-        height = ymax - ymin
-        data = np.squeeze(infer_result)
-        for index in range(5):
-            x = int(data[2 * index] * width) + xmin
-            y = int(data[2 * index + 1] * height) + ymin
-            cv.circle(landmark_frame, (x, y), 10, color_picker[index], thickness=-1)
+        # 領域の幅と高さを計算
+        face_width = xmax - xmin
+        face_height = ymax - ymin
+
+        # 推論結果を取得し、各ランドマークの位置を計算
+        landmark_coords = np.squeeze(infer_result)
+        for index in range(max_num):
+            # 推論結果から各ランドマークの位置を取得する。
+            # 各ランドマークの座標は0.0〜1.0で表されているので、
+            # フレーム内の実際の位置に変換するために、
+            # フレームの領域幅と高さにそれぞれ掛けてから、
+            # フレームのxmin、yminの値を足すことで実際の座標を計算する。
+            INDEX_X = 2 * index
+            INDEX_Y = 2 * index + 1
+            landmark_x = int(landmark_coords[INDEX_X] * face_width) + xmin
+            landmark_y = int(landmark_coords[INDEX_Y] * face_height) + ymin
+
+            # 画像上にランドマークを描画
+            cv.circle(
+                frame, (landmark_x, landmark_y), 10, color_picker[index], thickness=-1
+            )
             cv.putText(
-                landmark_frame,
+                frame,
                 str(index),
-                (x, y - 10),
+                (landmark_x, landmark_y - 10),
                 cv.FONT_HERSHEY_PLAIN,
                 2,
                 color_picker[index],
                 1,
                 cv.LINE_AA,
             )
-            logger.debug({"action": "draw", "part": parts[index], "x": x, "y": y})
-        return landmark_frame
+
+            logger.debug(
+                {
+                    "action": "draw",
+                    "part": parts[index],
+                    "x": landmark_x,
+                    "y": landmark_y,
+                }
+            )
+
+    def crop(self, infer_result, xmin, ymin, xmax, ymax):
+        parts = [
+            "right_eye",
+            "left_eye",
+            "nose",
+            "right_mouth",
+            "left_mouth",
+        ]
+        landmarks = []
+        face_width = xmax - xmin
+        face_height = ymax - ymin
+        landmark_coords = np.squeeze(infer_result)
+        for index in range(len(parts)):
+            INDEX_X = 2 * index
+            INDEX_Y = 2 * index + 1
+            landmark_x = int(landmark_coords[INDEX_X] * face_width) + xmin
+            landmark_y = int(landmark_coords[INDEX_Y] * face_height) + ymin
+            landmarks.append((landmark_x, landmark_y))
+            logger.debug(
+                {
+                    "action": "crop",
+                    "part": parts[index],
+                    "landmark_x": landmark_x,
+                    "landmark_y": landmark_y,
+                }
+            )
+        # ランドマークの位置座標のリストを返す
+        return landmarks
+
+
+class OpenClosedEye(Model):
+    def __init__(self, ie_core, model_path, device_name="CPU", num_requests=0):
+        super(OpenClosedEye, self).__init__(
+            ie_core=ie_core,
+            model_path=model_path,
+            device_name=device_name,
+            num_requests=num_requests,
+        )
+
+    def prepare_data(self, output):
+        if output[0][0] > output[0][1]:
+            return "closed"
+        else:
+            return "open"
 
 
 if __name__ == "__main__":
@@ -196,23 +275,40 @@ if __name__ == "__main__":
     DEVICE = 0
     DELAY = 1
     KEYCODE_ESC = 27
+    FACE_FRAME_INDEX_X = 1
+    FACE_FRAME_INDEX_Y = 0
+    RIGHT_EYE_INDEX = 0
+    LEFT_EYE_INDEX = 1
     IECORE = IECore()
     PROJECT_ROOT = Path(__file__).resolve().parent
     MODEL_PATH = {}
     FACE_DETECTION_MODEL = "face-detection-retail-0005"
     LANDMARK_REGRESSION_MODEL = "landmarks-regression-retail-0009"
-    for model in [FACE_DETECTION_MODEL, LANDMARK_REGRESSION_MODEL]:
+    OPEN_CLOSED_EYE_MODEL = "open-closed-eye-0001"
+    MODELS = [FACE_DETECTION_MODEL, LANDMARK_REGRESSION_MODEL]
+    for model in MODELS:
         cmd = f"omz_downloader --name {model}"
         model_dir = PROJECT_ROOT / "intel" / model
-        model_path = str(model_dir / f"FP16/{model}")
+        model_path = str(model_dir / f"FP32/{model}")
         if not model_dir.exists():
             subprocess.call(cmd.split(" "), cwd=str(PROJECT_ROOT))
         MODEL_PATH[model] = model_path
+    cmd = f"omz_downloader --name {OPEN_CLOSED_EYE_MODEL}"
+    model_dir = PROJECT_ROOT / "public" / OPEN_CLOSED_EYE_MODEL
+    model_path = str(model_dir / f"FP32/{OPEN_CLOSED_EYE_MODEL}")
+    if not model_dir.exists():
+        subprocess.call(cmd.split(" "), cwd=str(PROJECT_ROOT))
+        subprocess.call(
+            f"omz_converter --name {OPEN_CLOSED_EYE_MODEL}".split(" "),
+            cwd=str(PROJECT_ROOT),
+        )
+    MODEL_PATH[OPEN_CLOSED_EYE_MODEL] = model_path
     camera = Camera(DEVICE)
     face_detector = FacialDetectionModel(IECORE, MODEL_PATH[FACE_DETECTION_MODEL])
     landmark_regression = FacialLandmarkRegressionModel(
         IECORE, MODEL_PATH[LANDMARK_REGRESSION_MODEL]
     )
+    open_closed_eye = OpenClosedEye(IECORE, MODEL_PATH[OPEN_CLOSED_EYE_MODEL])
     try:
         while camera.cap.isOpened():
             _, frame = camera.read()
@@ -223,10 +319,41 @@ if __name__ == "__main__":
                 face_frame, xmin, ymin, xmax, ymax = face_detector.crop(data, frame)
                 input_frame = landmark_regression.prepare_frame(face_frame)
                 infer_result = landmark_regression.infer(input_frame)
-                landmark_frame = landmark_regression.draw(
-                    infer_result, frame, xmin, ymin, xmax, ymax
+                data_array = landmark_regression.crop(
+                    infer_result, xmin, ymin, xmax, ymax
                 )
-            cv.imshow("landmark_frame", landmark_frame)
+                for index, data in enumerate(data_array):
+                    x, y = data
+                    eye_frame = frame[
+                        y
+                        - face_frame.shape[FACE_FRAME_INDEX_Y] // 5 : y
+                        + face_frame.shape[FACE_FRAME_INDEX_Y] // 5,
+                        x
+                        - face_frame.shape[FACE_FRAME_INDEX_X] // 5 : x
+                        + face_frame.shape[FACE_FRAME_INDEX_X] // 5,
+                    ]
+                    input_frame = open_closed_eye.prepare_frame(eye_frame)
+                    eye_infer_result = open_closed_eye.infer(input_frame)
+                    eye_infer_result = open_closed_eye.prepare_data(eye_infer_result)
+                    eye_frame = cv.resize(eye_frame, (300, 300))
+                    cv.putText(
+                        eye_frame,
+                        eye_infer_result,
+                        (100, 100),
+                        cv.FONT_HERSHEY_PLAIN,
+                        2,
+                        (0, 255, 255) if eye_infer_result == "open" else (255, 0, 0),
+                        1,
+                        cv.LINE_AA,
+                    )
+                    if index == RIGHT_EYE_INDEX:
+                        cv.imshow("right_eye_frame", eye_frame)
+                    elif index == LEFT_EYE_INDEX:
+                        cv.imshow("left_eye_frame", eye_frame)
+                landmark_regression.draw(
+                    infer_result, frame, xmin, ymin, xmax, ymax, max_num=2
+                )
+            cv.imshow("frame", frame)
             key = cv.waitKey(DELAY)
             if key == KEYCODE_ESC:
                 raise (KeyboardInterrupt)
