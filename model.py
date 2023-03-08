@@ -274,20 +274,20 @@ class EmotionsRecognition(Model):
             num_requests=num_requests,
         )
 
-    def smile_score(self, infer_result):
-        INDEX_SMILE = 1
-        emotions_result = np.squeeze(infer_result)
-        smile_score = emotions_result[INDEX_SMILE]
-        return smile_score
+    def score(self, infer_result):
+        emotions_score = np.squeeze(infer_result)
+        return emotions_score
 
-    def smile_draw(self, xmin, ymin, xmax, ymax, smile_score, frame):
+    def smile_draw(self, xmin, ymin, xmax, ymax, emotions_score, frame):
         blue = (255, 0, 0)
         yellow = (0, 255, 255)
+        emotion = np.argmax(emotions_score)
+        SMILE_INDEX = 1
         cv.rectangle(
             frame,
             (int(xmin), int(ymin)),
             (int(xmax), int(ymax)),
-            color=yellow if smile_score > 0.2 else blue,
+            color=yellow if emotion == SMILE_INDEX else blue,
             thickness=3,
         )
         logger.debug(
@@ -340,8 +340,10 @@ if __name__ == "__main__":
             face_frame, xmin, ymin, xmax, ymax = face_detector.crop(data, frame)
             input_frame = emotions_regression.prepare_frame(face_frame)
             infer_result = emotions_regression.infer(input_frame)
-            smile_score = emotions_regression.smile_score(infer_result)
-            emotions_regression.smile_draw(xmin, ymin, xmax, ymax, smile_score, frame)
+            emotions_score = emotions_regression.score(infer_result)
+            emotions_regression.smile_draw(
+                xmin, ymin, xmax, ymax, emotions_score, frame
+            )
         return frame
 
     smile_regress()
