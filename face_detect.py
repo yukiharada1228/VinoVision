@@ -21,7 +21,6 @@ if not MODEL_DIR.exists():
 face_detector = FacialDetectionModel(IECORE, MODEL_PATH)
 
 
-@camera
 def face_detect(frame):
     input_frame = face_detector.prepare_frame(frame)
     infer_result = face_detector.infer(input_frame)
@@ -30,4 +29,10 @@ def face_detect(frame):
     return frame
 
 
-face_detect()
+@camera
+def camera_face_detect(frame):
+    frame = face_detect(frame)
+    return frame
+
+
+camera_face_detect()

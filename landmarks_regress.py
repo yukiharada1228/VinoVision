@@ -30,7 +30,6 @@ landmark_regression = FacialLandmarkRegressionModel(
 )
 
 
-@camera
 def landmarks_regress(frame):
     input_frame = face_detector.prepare_frame(frame)
     infer_result = face_detector.infer(input_frame)
@@ -43,4 +42,10 @@ def landmarks_regress(frame):
     return frame
 
 
-landmarks_regress()
+@camera
+def camera_landmarks_regress(frame):
+    frame = landmarks_regress(frame)
+    return frame
+
+
+camera_landmarks_regress()

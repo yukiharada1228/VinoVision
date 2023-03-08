@@ -28,7 +28,6 @@ face_detector = FacialDetectionModel(IECORE, MODEL_PATH[FACE_DETECTION_MODEL])
 emotions_regression = EmotionsRecognition(IECORE, MODEL_PATH[EMOTIONS_REGRESSION_MODEL])
 
 
-@camera
 def smile_regress(frame):
     input_frame = face_detector.prepare_frame(frame)
     infer_result = face_detector.infer(input_frame)
@@ -44,4 +43,10 @@ def smile_regress(frame):
     return frame
 
 
-smile_regress()
+@camera
+def camera_smile_regress(frame):
+    frame = smile_regress(frame)
+    return frame
+
+
+camera_smile_regress()
