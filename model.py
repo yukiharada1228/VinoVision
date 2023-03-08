@@ -298,6 +298,38 @@ class EmotionsRecognition(Model):
         )
         return frame
 
+    def draw(self, xmin, ymin, xmax, ymax, emotions_score, frame, smile_mode=False):
+        color_picker = [
+            (255, 0, 0),
+            (0, 255, 255),
+            (0, 255, 0),
+            (255, 0, 255),
+            (0, 0, 255),
+        ]
+        NEUTRAL_INDEX = 0
+        SMILE_INDEX = 1
+        emotion = np.argmax(emotions_score)
+        if emotion == 1:
+            color = color_picker[SMILE_INDEX]
+        elif smile_mode:
+            color = color_picker[NEUTRAL_INDEX]
+        else:
+            color = color_picker[emotion]
+        cv.rectangle(
+            frame,
+            (int(xmin), int(ymin)),
+            (int(xmax), int(ymax)),
+            color=color,
+            thickness=3,
+        )
+        logger.debug(
+            {
+                "action": "draw",
+                "frame.shape": frame.shape,
+            }
+        )
+        return frame
+
 
 if __name__ == "__main__":
     import logging
@@ -332,7 +364,7 @@ if __name__ == "__main__":
     )
 
     @camera
-    def smile_regress(frame):
+    def emotions_regress(frame):
         input_frame = face_detector.prepare_frame(frame)
         infer_result = face_detector.infer(input_frame)
         data_array = face_detector.prepare_data(infer_result, frame)
@@ -341,9 +373,7 @@ if __name__ == "__main__":
             input_frame = emotions_regression.prepare_frame(face_frame)
             infer_result = emotions_regression.infer(input_frame)
             emotions_score = emotions_regression.score(infer_result)
-            emotions_regression.smile_draw(
-                xmin, ymin, xmax, ymax, emotions_score, frame
-            )
+            emotions_regression.draw(xmin, ymin, xmax, ymax, emotions_score, frame)
         return frame
 
-    smile_regress()
+    emotions_regress()
