@@ -5,7 +5,6 @@ from pathlib import Path
 
 from openvino.inference_engine import IECore
 
-from camera import camera
 from model import FacialDetectionModel, FacialLandmarkRegressionModel
 
 # ロギングの設定
@@ -42,10 +41,12 @@ def landmarks_regress(frame):
     return frame
 
 
-@camera
-def camera_landmarks_regress(frame):
-    frame = landmarks_regress(frame)
-    return frame
+if __name__ == "__main__":
+    from camera import camera
 
+    @camera
+    def camera_landmarks_regress(frame):
+        frame = landmarks_regress(frame)
+        return frame
 
-camera_landmarks_regress()
+    camera_landmarks_regress()

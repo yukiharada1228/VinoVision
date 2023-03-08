@@ -5,7 +5,6 @@ from pathlib import Path
 
 from openvino.inference_engine import IECore
 
-from camera import camera
 from model import FacialDetectionModel
 
 logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
@@ -29,10 +28,12 @@ def face_detect(frame):
     return frame
 
 
-@camera
-def camera_face_detect(frame):
-    frame = face_detect(frame)
-    return frame
+if __name__ == "__main__":
+    from camera import camera
 
+    @camera
+    def camera_face_detect(frame):
+        frame = face_detect(frame)
+        return frame
 
-camera_face_detect()
+    camera_face_detect()
