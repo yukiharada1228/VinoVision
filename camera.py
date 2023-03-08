@@ -36,22 +36,39 @@ class Camera(object):
             self.release()
 
 
-if __name__ == "__main__":
-    DEVICE = 0
-    DELAY = 1
-    KEYCODE_ESC = 27
+def camera(process):
+    def inner():
+        DEVICE = 0
+        DELAY = 1
+        KEYCODE_ESC = 27
 
-    camera = Camera(DEVICE)
-    try:
-        while camera.cap.isOpened():
-            _, frame = camera.read()
-            cv.imshow("frame", frame)
-            logger.debug({"frame.shape": frame.shape})
-            key = cv.waitKey(DELAY)
-            if key == KEYCODE_ESC:
-                raise (KeyboardInterrupt)
-    except KeyboardInterrupt as ex:
-        logger.warning({"ex": ex})
-    finally:
-        del camera
-        cv.destroyAllWindows()
+        camera = Camera(DEVICE)
+        try:
+            while camera.cap.isOpened():
+                _, frame = camera.read()
+                frame = process(frame)
+                cv.imshow("frame", frame)
+                logger.debug({"frame.shape": frame.shape})
+                key = cv.waitKey(DELAY)
+                if key == KEYCODE_ESC:
+                    raise (KeyboardInterrupt)
+        except KeyboardInterrupt as ex:
+            logger.warning({"ex": ex})
+        finally:
+            del camera
+            cv.destroyAllWindows()
+
+    return inner
+
+
+if __name__ == "__main__":
+    import sys
+
+    logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
+
+    @camera
+    def process(frame):
+        logger.debug({"action": "process"})
+        return frame
+
+    process()
