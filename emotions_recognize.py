@@ -29,7 +29,7 @@ emotions_regression = EmotionsRecognition(IECORE, MODEL_PATH[EMOTIONS_REGRESSION
 
 
 @camera
-def smile_regress(frame):
+def emotions_regress(frame):
     input_frame = face_detector.prepare_frame(frame)
     infer_result = face_detector.infer(input_frame)
     data_array = face_detector.prepare_data(infer_result, frame)
@@ -38,10 +38,8 @@ def smile_regress(frame):
         input_frame = emotions_regression.prepare_frame(face_frame)
         infer_result = emotions_regression.infer(input_frame)
         emotions_score = emotions_regression.score(infer_result)
-        emotions_regression.draw(
-            xmin, ymin, xmax, ymax, emotions_score, frame, smile_mode=True
-        )
+        emotions_regression.draw(xmin, ymin, xmax, ymax, emotions_score, frame)
     return frame
 
 
-smile_regress()
+emotions_regress()
