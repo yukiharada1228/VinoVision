@@ -2,11 +2,20 @@ import logging
 
 import cv2 as cv
 
-# ロギングの設定
 logger = logging.getLogger(__name__)
 
 
-class Camera(object):
+class Singleton(type):
+    _instances = {}
+
+    def __call__(cls, *args, **kwds):
+        device = args[0]
+        if device not in cls._instances:
+            cls._instances[device] = super(Singleton, cls).__call__(*args, **kwds)
+        return cls._instances[device]
+
+
+class Camera(metaclass=Singleton):
     def __init__(self, device):
         # カメラデバイスを開く
         self.cap = cv.VideoCapture(device)
@@ -21,8 +30,7 @@ class Camera(object):
     def read(self):
         ret, frame = self.cap.read()
         if not ret:
-            # 読み取れなかった場合はエラー処理
-            logger.error("カメラからフレームを読み取れませんでした。")
+            logger.warning("カメラからフレームを読み取れませんでした。")
         return ret, frame
 
     def release(self):
@@ -41,7 +49,6 @@ def camera(process):
         DEVICE = 0
         DELAY = 1
         KEYCODE_ESC = 27
-
         camera = Camera(DEVICE)
         try:
             while camera.cap.isOpened():
