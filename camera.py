@@ -9,7 +9,8 @@ class Singleton(type):
     _instances = {}
 
     def __call__(cls, *args, **kwds):
-        device = args[0]
+        DEVICE_INDEX = 0
+        device = args[DEVICE_INDEX]
         if device not in cls._instances:
             cls._instances[device] = super(Singleton, cls).__call__(*args, **kwds)
         return cls._instances[device]
