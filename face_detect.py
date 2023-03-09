@@ -3,9 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from openvino.inference_engine import IECore
-
 from model import FacialDetectionModel
+from openvino.inference_engine import IECore
 
 logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
 logger = logging.getLogger(__name__)

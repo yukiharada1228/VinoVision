@@ -1,17 +1,17 @@
 import logging
 import subprocess
-import sys
 from pathlib import Path
 
 from openvino.inference_engine import IECore
 
-from model import EmotionsRecognition, FacialDetectionModel
-
-# ロギングの設定
-logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 IECORE = IECore()
 PROJECT_ROOT = Path(__file__).resolve().parent
+import sys
+
+sys.path.append(str(PROJECT_ROOT))
+from model import EmotionsRecognition, FacialDetectionModel
+
 MODEL_PATH = {}
 FACE_DETECTION_MODEL = "face-detection-retail-0005"
 EMOTIONS_REGRESSION_MODEL = "emotions-recognition-retail-0003"
@@ -43,7 +43,11 @@ def smile_regress(frame):
 
 
 if __name__ == "__main__":
+    import sys
+
     from camera import camera
+
+    logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
 
     @camera
     def camera_smile_regress(frame):

@@ -4,8 +4,6 @@ import cv2 as cv
 import numpy as np
 from openvino.inference_engine import IECore
 
-from camera import Camera
-
 logger = logging.getLogger(__name__)
 
 
@@ -337,10 +335,9 @@ if __name__ == "__main__":
     import sys
     from pathlib import Path
 
-    from openvino.inference_engine import IECore
-
     from camera import camera
     from model import EmotionsRecognition, FacialDetectionModel
+    from openvino.inference_engine import IECore
 
     # ロギングの設定
     logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
