@@ -5,7 +5,6 @@ from pathlib import Path
 
 from openvino.inference_engine import IECore
 
-from camera import camera
 from model import EmotionsRecognition, FacialDetectionModel
 
 # ロギングの設定
@@ -28,7 +27,6 @@ face_detector = FacialDetectionModel(IECORE, MODEL_PATH[FACE_DETECTION_MODEL])
 emotions_regression = EmotionsRecognition(IECORE, MODEL_PATH[EMOTIONS_REGRESSION_MODEL])
 
 
-@camera
 def emotions_regress(frame):
     input_frame = face_detector.prepare_frame(frame)
     infer_result = face_detector.infer(input_frame)
@@ -42,4 +40,12 @@ def emotions_regress(frame):
     return frame
 
 
-emotions_regress()
+if __name__ == "__main__":
+    from camera import camera
+
+    @camera
+    def camera_emotions_regress(frame):
+        frame = emotions_regress(frame)
+        return frame
+
+    camera_emotions_regress()
