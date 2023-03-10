@@ -32,8 +32,10 @@ def smile_regress(frame):
     infer_result = face_detector.infer(input_frame)
     data_array = face_detector.prepare_data(infer_result, frame)
     emotions_score_list = []
+    face_frame_list = []
+    face_frame = frame.copy()
     for data in data_array:
-        face_frame, xmin, ymin, xmax, ymax = face_detector.crop(data, frame)
+        face_frame, xmin, ymin, xmax, ymax = face_detector.crop(data, face_frame)
         input_frame = emotions_regression.prepare_frame(face_frame)
         infer_result = emotions_regression.infer(input_frame)
         emotions_score = emotions_regression.score(infer_result)
@@ -41,7 +43,8 @@ def smile_regress(frame):
             xmin, ymin, xmax, ymax, emotions_score, frame, smile_mode=True
         )
         emotions_score_list.append(emotions_score)
-    return emotions_score_list, frame
+        face_frame_list.append(face_frame)
+    return emotions_score_list, face_frame_list, frame
 
 
 if __name__ == "__main__":
@@ -53,7 +56,7 @@ if __name__ == "__main__":
 
     @camera
     def camera_smile_regress(frame):
-        _, frame = smile_regress(frame)
+        _, _, frame = smile_regress(frame)
         return frame
 
     camera_smile_regress()
