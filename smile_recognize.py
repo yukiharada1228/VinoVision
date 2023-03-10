@@ -25,7 +25,7 @@ for model in MODELS:
     MODEL_PATH[model] = model_path
 face_detector = FacialDetectionModel(IECORE, MODEL_PATH[FACE_DETECTION_MODEL])
 emotions_regression = EmotionsRecognition(IECORE, MODEL_PATH[EMOTIONS_REGRESSION_MODEL])
-    
+
 
 if __name__ == "__main__":
     import sys
@@ -41,7 +41,9 @@ if __name__ == "__main__":
         data_array = face_detector.prepare_data(infer_result, frame)
         original_frame = frame.copy()
         for i, data in enumerate(data_array):
-            face_frame, xmin, ymin, xmax, ymax = face_detector.crop(data, original_frame)
+            face_frame, xmin, ymin, xmax, ymax = face_detector.crop(
+                data, original_frame
+            )
             input_frame = emotions_regression.prepare_frame(face_frame)
             infer_result = emotions_regression.infer(input_frame)
             emotions_score = emotions_regression.score(infer_result)

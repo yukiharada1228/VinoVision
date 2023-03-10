@@ -335,9 +335,10 @@ if __name__ == "__main__":
     import sys
     from pathlib import Path
 
+    from openvino.inference_engine import IECore
+
     from camera import camera
     from model import EmotionsRecognition, FacialDetectionModel
-    from openvino.inference_engine import IECore
 
     # ロギングの設定
     logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
