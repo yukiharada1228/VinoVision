@@ -407,6 +407,16 @@ if __name__ == "__main__":
             input_frame = gender_recognize.prepare_frame(face_frame_rotated)
             infer_result = gender_recognize.infer(input_frame)
             gender = gender_recognize.prepare_data(infer_result)
+            cv.putText(
+                frame,
+                gender,
+                (100, 100),
+                cv.FONT_HERSHEY_PLAIN,
+                2,
+                (0, 255, 255) if gender == "Female" else (255, 0, 0),
+                1,
+                cv.LINE_AA,
+            )
             logger.info(gender)
         return frame
 
