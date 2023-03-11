@@ -386,7 +386,6 @@ if __name__ == "__main__":
             face_frame, xmin, ymin, xmax, ymax = face_detector.crop(data, frame)
             input_frame = landmark_regression.prepare_frame(face_frame)
             infer_result = landmark_regression.infer(input_frame)
-
             landmarks = np.squeeze(infer_result)
             left_eye_x = landmarks[0]
             left_eye_y = landmarks[1]
@@ -402,11 +401,19 @@ if __name__ == "__main__":
             rows, cols, _ = face_frame.shape
             M = cv.getRotationMatrix2D((center_x, center_y), angle, 1)
             face_frame_rotated = cv.warpAffine(face_frame, M, (cols, rows))
-            cv.imshow("face_frame_rotated", face_frame_rotated)
-
             input_frame = gender_recognize.prepare_frame(face_frame_rotated)
             infer_result = gender_recognize.infer(input_frame)
             gender = gender_recognize.prepare_data(infer_result)
+            cv.putText(
+                frame,
+                gender,
+                (xmin, ymin),
+                cv.FONT_HERSHEY_PLAIN,
+                2,
+                (0, 255, 255) if gender == "Female" else (255, 0, 0),
+                1,
+                cv.LINE_AA,
+            )
             logger.info(gender)
         return frame
 
