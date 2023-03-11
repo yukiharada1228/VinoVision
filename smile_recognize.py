@@ -27,26 +27,6 @@ face_detector = FacialDetectionModel(IECORE, MODEL_PATH[FACE_DETECTION_MODEL])
 emotions_regression = EmotionsRecognition(IECORE, MODEL_PATH[EMOTIONS_REGRESSION_MODEL])
 
 
-def smile_regress(frame):
-    input_frame = face_detector.prepare_frame(frame)
-    infer_result = face_detector.infer(input_frame)
-    data_array = face_detector.prepare_data(infer_result, frame)
-    emotions_score_list = []
-    face_frame_list = []
-    face_frame = frame.copy()
-    for data in data_array:
-        face_frame, xmin, ymin, xmax, ymax = face_detector.crop(data, face_frame)
-        input_frame = emotions_regression.prepare_frame(face_frame)
-        infer_result = emotions_regression.infer(input_frame)
-        emotions_score = emotions_regression.score(infer_result)
-        emotions_regression.draw(
-            xmin, ymin, xmax, ymax, emotions_score, frame, smile_mode=True
-        )
-        emotions_score_list.append(emotions_score)
-        face_frame_list.append(face_frame)
-    return emotions_score_list, face_frame_list, frame
-
-
 if __name__ == "__main__":
     import sys
 
@@ -55,8 +35,21 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
 
     @camera
-    def camera_smile_regress(frame):
-        _, _, frame = smile_regress(frame)
+    def smile_regress(frame):
+        input_frame = face_detector.prepare_frame(frame)
+        infer_result = face_detector.infer(input_frame)
+        data_array = face_detector.prepare_data(infer_result, frame)
+        original_frame = frame.copy()
+        for i, data in enumerate(data_array):
+            face_frame, xmin, ymin, xmax, ymax = face_detector.crop(
+                data, original_frame
+            )
+            input_frame = emotions_regression.prepare_frame(face_frame)
+            infer_result = emotions_regression.infer(input_frame)
+            emotions_score = emotions_regression.score(infer_result)
+            emotions_regression.draw(
+                xmin, ymin, xmax, ymax, emotions_score, frame, smile_mode=True
+            )
         return frame
 
-    camera_smile_regress()
+    smile_regress()

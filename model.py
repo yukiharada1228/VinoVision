@@ -1,4 +1,5 @@
 import logging
+import math
 
 import cv2 as cv
 import numpy as np
@@ -262,6 +263,35 @@ class OpenClosedEyeRegression(Model):
         else:
             return "open"
 
+class GenderRecognize(Model):
+    def __init__(self, ie_core, model_path, device_name="CPU", num_requests=0):
+        super(GenderRecognize, self).__init__(
+            ie_core=ie_core,
+            model_path=model_path,
+            device_name=device_name,
+            num_requests=num_requests,
+        )
+
+    def infer(self, data):
+        input_data = {self.input_name: data}
+
+        infer_result = self.exec_net.infer(input_data)["prob"]
+
+        logger.debug(
+            {
+                "action": "infer",
+                "input_data.shape": input_data[self.input_name].shape,
+                "infer_result.shape": infer_result.shape,
+            }
+        )
+
+        return infer_result
+
+    def prepare_data(self, output):
+        output = np.squeeze(output)
+        gender = "Female" if output[1] < output[0] else "Male"
+        return gender
+
 
 class EmotionsRecognition(Model):
     def __init__(self, ie_core, model_path, device_name="CPU", num_requests=0):
@@ -275,26 +305,6 @@ class EmotionsRecognition(Model):
     def score(self, infer_result):
         emotions_score = np.squeeze(infer_result)
         return emotions_score
-
-    def smile_draw(self, xmin, ymin, xmax, ymax, emotions_score, frame):
-        blue = (255, 0, 0)
-        yellow = (0, 255, 255)
-        emotion = np.argmax(emotions_score)
-        SMILE_INDEX = 1
-        cv.rectangle(
-            frame,
-            (int(xmin), int(ymin)),
-            (int(xmax), int(ymax)),
-            color=yellow if emotion == SMILE_INDEX else blue,
-            thickness=3,
-        )
-        logger.debug(
-            {
-                "action": "draw",
-                "frame.shape": frame.shape,
-            }
-        )
-        return frame
 
     def draw(self, xmin, ymin, xmax, ymax, emotions_score, frame, smile_mode=False):
         color_picker = [
@@ -335,19 +345,21 @@ if __name__ == "__main__":
     import sys
     from pathlib import Path
 
-    from camera import camera
-    from model import EmotionsRecognition, FacialDetectionModel
     from openvino.inference_engine import IECore
 
+    from camera import camera
+    from model import EmotionsRecognition, FacialDetectionModel
+
     # ロギングの設定
-    logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
     logger = logging.getLogger(__name__)
     IECORE = IECore()
     PROJECT_ROOT = Path(__file__).resolve().parent
     MODEL_PATH = {}
     FACE_DETECTION_MODEL = "face-detection-retail-0005"
-    EMOTIONS_REGRESSION_MODEL = "emotions-recognition-retail-0003"
-    MODELS = [FACE_DETECTION_MODEL, EMOTIONS_REGRESSION_MODEL]
+    LANDMARK_REGRESSION_MODEL = "landmarks-regression-retail-0009"
+    AGE_GENDER_RECOGNITION_MODEL = "age-gender-recognition-retail-0013"
+    MODELS = [FACE_DETECTION_MODEL, LANDMARK_REGRESSION_MODEL, AGE_GENDER_RECOGNITION_MODEL]
     for model in MODELS:
         cmd = f"omz_downloader --name {model}"
         model_dir = PROJECT_ROOT / "intel" / model
@@ -356,21 +368,40 @@ if __name__ == "__main__":
             subprocess.call(cmd.split(" "), cwd=str(PROJECT_ROOT))
         MODEL_PATH[model] = model_path
     face_detector = FacialDetectionModel(IECORE, MODEL_PATH[FACE_DETECTION_MODEL])
-    emotions_regression = EmotionsRecognition(
-        IECORE, MODEL_PATH[EMOTIONS_REGRESSION_MODEL]
+    landmark_regression = FacialLandmarkRegressionModel(
+        IECORE, MODEL_PATH[LANDMARK_REGRESSION_MODEL]
+    )
+    gender_recognize = GenderRecognize(
+        IECORE, MODEL_PATH[AGE_GENDER_RECOGNITION_MODEL]
     )
 
     @camera
-    def emotions_regress(frame):
+    def process(frame):
         input_frame = face_detector.prepare_frame(frame)
         infer_result = face_detector.infer(input_frame)
         data_array = face_detector.prepare_data(infer_result, frame)
         for data in data_array:
             face_frame, xmin, ymin, xmax, ymax = face_detector.crop(data, frame)
-            input_frame = emotions_regression.prepare_frame(face_frame)
-            infer_result = emotions_regression.infer(input_frame)
-            emotions_score = emotions_regression.score(infer_result)
-            emotions_regression.draw(xmin, ymin, xmax, ymax, emotions_score, frame)
+            input_frame = landmark_regression.prepare_frame(face_frame)
+            infer_result = landmark_regression.infer(input_frame)
+            
+            landmarks = np.squeeze(infer_result)
+            left_eye_x = landmarks[0]
+            left_eye_y = landmarks[1]
+            right_eye_x = landmarks[2]
+            right_eye_y = landmarks[3]
+            center_x = (left_eye_x + right_eye_x) / 2
+            center_y = (left_eye_y + right_eye_y) / 2
+            angle = math.atan2(right_eye_y - left_eye_y, right_eye_x - left_eye_x) * 180 / math.pi
+            rows, cols, _ = face_frame.shape
+            M = cv.getRotationMatrix2D((center_x, center_y), angle, 1)
+            face_frame_rotated = cv.warpAffine(face_frame, M, (cols, rows))
+            cv.imshow("face_frame_rotated", face_frame_rotated)
+
+            input_frame = gender_recognize.prepare_frame(face_frame_rotated)
+            infer_result = gender_recognize.infer(input_frame)
+            gender = gender_recognize.prepare_data(infer_result)
+            logger.info(gender)
         return frame
 
-    emotions_regress()
+    process()

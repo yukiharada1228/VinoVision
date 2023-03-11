@@ -3,8 +3,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from model import EmotionsRecognition, FacialDetectionModel
 from openvino.inference_engine import IECore
+
+from model import EmotionsRecognition, FacialDetectionModel
 
 # ロギングの設定
 logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)

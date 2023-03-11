@@ -2,10 +2,11 @@ import logging
 import subprocess
 
 import cv2 as cv
+from openvino.inference_engine import IECore
+
 from camera import camera
 from model import (FacialDetectionModel, FacialLandmarkRegressionModel,
                    OpenClosedEyeRegression)
-from openvino.inference_engine import IECore
 
 logger = logging.getLogger(__name__)
 import sys
