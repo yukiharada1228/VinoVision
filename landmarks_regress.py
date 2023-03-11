@@ -3,9 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from openvino.inference_engine import IECore
-
 from model import FacialDetectionModel, FacialLandmarkRegressionModel
+from openvino.inference_engine import IECore
 
 # ロギングの設定
 logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)

@@ -263,6 +263,7 @@ class OpenClosedEyeRegression(Model):
         else:
             return "open"
 
+
 class GenderRecognize(Model):
     def __init__(self, ie_core, model_path, device_name="CPU", num_requests=0):
         super(GenderRecognize, self).__init__(
@@ -345,10 +346,9 @@ if __name__ == "__main__":
     import sys
     from pathlib import Path
 
-    from openvino.inference_engine import IECore
-
     from camera import camera
     from model import EmotionsRecognition, FacialDetectionModel
+    from openvino.inference_engine import IECore
 
     # ロギングの設定
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
@@ -359,7 +359,11 @@ if __name__ == "__main__":
     FACE_DETECTION_MODEL = "face-detection-retail-0005"
     LANDMARK_REGRESSION_MODEL = "landmarks-regression-retail-0009"
     AGE_GENDER_RECOGNITION_MODEL = "age-gender-recognition-retail-0013"
-    MODELS = [FACE_DETECTION_MODEL, LANDMARK_REGRESSION_MODEL, AGE_GENDER_RECOGNITION_MODEL]
+    MODELS = [
+        FACE_DETECTION_MODEL,
+        LANDMARK_REGRESSION_MODEL,
+        AGE_GENDER_RECOGNITION_MODEL,
+    ]
     for model in MODELS:
         cmd = f"omz_downloader --name {model}"
         model_dir = PROJECT_ROOT / "intel" / model
@@ -371,9 +375,7 @@ if __name__ == "__main__":
     landmark_regression = FacialLandmarkRegressionModel(
         IECORE, MODEL_PATH[LANDMARK_REGRESSION_MODEL]
     )
-    gender_recognize = GenderRecognize(
-        IECORE, MODEL_PATH[AGE_GENDER_RECOGNITION_MODEL]
-    )
+    gender_recognize = GenderRecognize(IECORE, MODEL_PATH[AGE_GENDER_RECOGNITION_MODEL])
 
     @camera
     def process(frame):
@@ -384,7 +386,7 @@ if __name__ == "__main__":
             face_frame, xmin, ymin, xmax, ymax = face_detector.crop(data, frame)
             input_frame = landmark_regression.prepare_frame(face_frame)
             infer_result = landmark_regression.infer(input_frame)
-            
+
             landmarks = np.squeeze(infer_result)
             left_eye_x = landmarks[0]
             left_eye_y = landmarks[1]
@@ -392,7 +394,11 @@ if __name__ == "__main__":
             right_eye_y = landmarks[3]
             center_x = (left_eye_x + right_eye_x) / 2
             center_y = (left_eye_y + right_eye_y) / 2
-            angle = math.atan2(right_eye_y - left_eye_y, right_eye_x - left_eye_x) * 180 / math.pi
+            angle = (
+                math.atan2(right_eye_y - left_eye_y, right_eye_x - left_eye_x)
+                * 180
+                / math.pi
+            )
             rows, cols, _ = face_frame.shape
             M = cv.getRotationMatrix2D((center_x, center_y), angle, 1)
             face_frame_rotated = cv.warpAffine(face_frame, M, (cols, rows))

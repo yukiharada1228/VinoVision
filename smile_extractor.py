@@ -12,7 +12,6 @@ IECORE = IECore()
 PROJECT_ROOT = Path(__file__).resolve().parent
 
 import cv2 as cv
-
 from video import Video
 
 sys.path.append(str(PROJECT_ROOT))
